@@ -171,8 +171,9 @@
       send.addEventListener('click', async () => {
         send.disabled = true
         try {
-          await call('/api/app/ask', { sid, text: text.value })
+          const asked = await call('/api/app/ask', { sid, text: text.value })
           text.value = ''
+          if (asked.merged) $('error').textContent = 'Someone already asked that, so we added your vote to it.'
           $('count').textContent = '0 / 280'
           tg?.HapticFeedback?.notificationOccurred('success')
           await refresh()

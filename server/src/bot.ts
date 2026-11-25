@@ -80,6 +80,11 @@ export function createBot(token: string): Bot {
     if (!session) return ctx.reply('No Q&A is running. An admin can start one with /host.')
     const result = await ask(session, { id: ctx.from.id, name: displayName(ctx.from) }, ctx.match, ctx.msg.message_id)
     if ('error' in result) return ctx.reply(result.error, { reply_parameters: { message_id: ctx.msg.message_id } })
+    if (result.merged) {
+      return ctx.reply('Someone already asked that, so your vote was added to their question.', {
+        reply_parameters: { message_id: ctx.msg.message_id },
+      })
+    }
     // A reaction instead of a reply keeps the group quiet.
     await ctx.react('👍').catch(() => {})
   })

@@ -105,6 +105,13 @@ export async function addQuestion(input: {
   return rows[0]
 }
 
+export async function openQuestions(sessionId: string): Promise<Array<{ id: string; text: string }>> {
+  return (await sql`
+    select id::text as id, text from questions
+    where session_id = ${sessionId} and status = 'open'
+    order by created_at desc limit 40`) as Array<{ id: string; text: string }>
+}
+
 export async function openCountFor(sessionId: string, tgUserId: number): Promise<number> {
   const rows = (await sql`
     select count(*)::int as n from questions

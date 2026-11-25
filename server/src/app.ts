@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import * as db from './db.js'
-import { shorten, summarise } from './ai.js'
+import { summarise } from './ai.js'
+import { transcribe } from './stt.js'
 import { ask } from './questions.js'
 import { webhook } from './telegram.js'
 import { notify } from './notify.js'
@@ -98,6 +99,23 @@ host.post('/draft', async c => {
   return c.json(await hostState(session))
 })
 
+/** A chunk of the host answering out loud. Only kept while that question is still on the lens. */
+host.post('/audio', async c => {
+  const id = c.req.query('q') ?? ''
+  const current = await db.currentQuestion(c.var.session.id)
+  if (!current || current.id !== id || current.status !== 'live') return c.json({ ok: false })
+  const pcm = new Uint8Array(await c.req.arrayBuffer())
+  if (pcm.length > 2_000_000) return c.json({ error: 'chunk too large' }, 413)
+  try {
+    const text = await transcribe(pcm)
+    if (text) await db.appendTranscript(id, text)
+    return c.json({ ok: true, heard: text.length > 0 })
+  } catch (e) {
+    console.error('audio', e)
+    return c.json({ ok: false })
+  }
+})
+
 host.post('/skip', async c => {
   const session = c.var.session
   const q = await db.currentQuestion(session.id)
@@ -159,7 +177,7 @@ audience.post('/ask', async c => {
   if (!session || session.status !== 'live') return c.json({ error: 'This Q&A has ended.' }, 404)
   const result = await ask(session, c.var.user, String(body.text ?? ''))
   if ('error' in result) return c.json(result, 400)
-  return c.json({ id: result.question.id })
+  return c.json({ id: result.question.id, merged: result.merged })
 })
 
 audience.post('/vote', async c => {
@@ -190,7 +208,7 @@ if (DEV) {
       ['Maria', 'Can you explain how fees work for the first five transfers each day, and what happens after that?', 4],
     ]
     for (const [name, text, votes] of samples) {
-      const q = await db.addQuestion({ sessionId: session.id, tgUserId: votes, tgName: name, text, short: await shorten(text) })
+      const q = await db.addQuestion({ sessionId: session.id, tgUserId: votes, tgName: name, text, short: text })
       await db.sql`update questions set votes = ${votes} where id = ${q.id}`
     }
     return c.json({ code: session.code, sessionId: session.id })
