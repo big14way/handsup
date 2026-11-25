@@ -2,11 +2,15 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import * as db from './db.js'
 import { shorten, summarise } from './ai.js'
+import { ask } from './questions.js'
+import { webhook } from './telegram.js'
 import { notify } from './notify.js'
+import { verifyInitData, type TgUser } from './tgauth.js'
 
 const DEV = process.env.DEV_AUTH === '1'
 
 type HostEnv = { Variables: { session: db.Session } }
+type AudienceEnv = { Variables: { user: TgUser } }
 
 export const app = new Hono()
 
@@ -113,6 +117,67 @@ host.post('/end', async c => {
 })
 
 app.route('/api/host', host)
+
+// ---------- audience (the Telegram Mini App) ----------
+
+const audience = new Hono<AudienceEnv>()
+
+audience.use('*', async (c, next) => {
+  let user: TgUser | null = null
+  const initData = c.req.header('x-telegram-init-data')
+  const botToken = process.env.BOT_TOKEN
+  if (initData && botToken) user = verifyInitData(initData, botToken)
+  const devUser = c.req.header('x-dev-user')
+  if (!user && DEV && devUser) {
+    const [id, ...name] = devUser.split(':')
+    if (Number(id) > 0) user = { id: Number(id), name: name.join(':').slice(0, 40) || 'Dev' }
+  }
+  if (!user) return c.json({ error: 'Open this from Telegram.' }, 401)
+  c.set('user', user)
+  await next()
+})
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+audience.get('/session/:sid', async c => {
+  const sid = c.req.param('sid')
+  const session = UUID.test(sid) ? await db.sessionById(sid) : null
+  if (!session) return c.json({ error: 'This Q&A was not found.' }, 404)
+  return c.json({
+    title: session.chat_title,
+    host: session.host_name,
+    status: session.status,
+    wallet: session.wallet,
+    questions: (await db.listQuestions(session.id, c.var.user.id)).map(q => ({ ...q, boost: Number(q.boost) })),
+  })
+})
+
+audience.post('/ask', async c => {
+  const body = await c.req.json().catch(() => ({}))
+  const sid = String(body.sid ?? '')
+  const session = UUID.test(sid) ? await db.sessionById(sid) : null
+  if (!session || session.status !== 'live') return c.json({ error: 'This Q&A has ended.' }, 404)
+  const result = await ask(session, c.var.user, String(body.text ?? ''))
+  if ('error' in result) return c.json(result, 400)
+  return c.json({ id: result.question.id })
+})
+
+audience.post('/vote', async c => {
+  const body = await c.req.json().catch(() => ({}))
+  const id = String(body.qid ?? '')
+  if (!/^\d+$/.test(id)) return c.json({ error: 'bad question' }, 400)
+  const votes = await db.vote(id, c.var.user.id)
+  return c.json({ votes })
+})
+
+app.route('/api/app', audience)
+
+// ---------- Telegram ----------
+
+app.post('/api/telegram', async c => {
+  if (!webhook) return c.json({ error: 'bot not configured' }, 503)
+  return webhook(c)
+})
 
 // ---------- local development only ----------
 

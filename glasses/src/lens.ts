@@ -1,5 +1,6 @@
 import {
   CreateStartUpPageContainer,
+  RebuildPageContainer,
   TextContainerProperty,
   TextContainerUpgrade,
   type EvenAppBridge,
@@ -19,28 +20,33 @@ const ROWS = [
 export async function createLens(bridge: EvenAppBridge, first: Card) {
   const shown: Record<string, string> = { ...first }
 
-  const created = await bridge.createStartUpPageContainer(
-    new CreateStartUpPageContainer({
-      containerTotalNum: ROWS.length,
-      textObject: ROWS.map(
-        row =>
-          new TextContainerProperty({
-            xPosition: 0,
-            yPosition: row.y,
-            width: W,
-            height: row.h,
-            borderWidth: 0,
-            paddingLength: 6,
-            containerID: row.id,
-            containerName: row.name,
-            content: first[row.name] || ' ',
-            textColor: row.color,
-            isEventCapture: row.capture,
-          }),
-      ),
-    }),
-  )
-  if (created !== 0) console.error('createStartUpPageContainer failed', created)
+  const page = {
+    containerTotalNum: ROWS.length,
+    textObject: ROWS.map(
+      row =>
+        new TextContainerProperty({
+          xPosition: 0,
+          yPosition: row.y,
+          width: W,
+          height: row.h,
+          borderWidth: 0,
+          paddingLength: 6,
+          containerID: row.id,
+          containerName: row.name,
+          content: first[row.name] || ' ',
+          textColor: row.color,
+          isEventCapture: row.capture,
+        }),
+    ),
+  }
+
+  // The startup page can only be created once per launch. If the WebView
+  // reloads while the glasses still hold our page, rebuild it instead.
+  const created = await bridge.createStartUpPageContainer(new CreateStartUpPageContainer(page))
+  if (created !== 0) {
+    const rebuilt = await bridge.rebuildPageContainer(new RebuildPageContainer(page))
+    if (!rebuilt) console.error('could not create the glasses page', created)
+  }
 
   // Writes go over Bluetooth one at a time; only rows that changed are sent.
   let queue: Promise<unknown> = Promise.resolve()

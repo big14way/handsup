@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Hands Up</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+      :root {
+        --bg: var(--tg-theme-secondary-bg-color, #f1f1f4);
+        --card: var(--tg-theme-bg-color, #ffffff);
+        --text: var(--tg-theme-text-color, #111114);
+        --hint: var(--tg-theme-hint-color, #7d7d85);
+        --accent: var(--tg-theme-button-color, #2481cc);
+        --on-accent: var(--tg-theme-button-text-color, #ffffff);
+        --line: color-mix(in srgb, var(--hint) 22%, transparent);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; background: var(--bg); color: var(--text);
+        font: 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      main { max-width: 560px; margin: 0 auto; padding: 16px 14px 40px; }
+      header h1 { font-size: 20px; margin: 4px 0 2px; }
+      header p { margin: 0 0 14px; color: var(--hint); font-size: 14px; }
+      .ask { background: var(--card); border-radius: 14px; padding: 12px; margin-bottom: 18px; }
+      textarea {
+        width: 100%; min-height: 68px; resize: none; border: 0; outline: 0; background: transparent;
+        color: var(--text); font: inherit;
+      }
+      textarea::placeholder { color: var(--hint); }
+      .ask-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .count { color: var(--hint); font-size: 13px; }
+      button { font: inherit; border: 0; cursor: pointer; }
+      .send { background: var(--accent); color: var(--on-accent); border-radius: 10px; padding: 9px 18px; font-weight: 600; }
+      .send:disabled { opacity: 0.45; }
+      #error { color: #d14343; font-size: 14px; min-height: 20px; margin-top: 6px; }
+      h2 { font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--hint); margin: 18px 4px 8px; }
+      .q { background: var(--card); border-radius: 14px; padding: 12px; margin-bottom: 8px; display: flex; gap: 12px; align-items: flex-start; }
+      .q.live { outline: 2px solid var(--accent); }
+      .q .body { flex: 1; min-width: 0; }
+      .q .text { overflow-wrap: anywhere; }
+      .q .who { color: var(--hint); font-size: 13px; margin-top: 4px; }
+      .q .summary { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 15px; }
+      .badge { display: inline-block; background: var(--accent); color: var(--on-accent); border-radius: 6px; padding: 1px 7px; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+      .vote {
+        min-width: 52px; border-radius: 10px; padding: 7px 4px; background: transparent; color: var(--text);
+        border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; line-height: 1.15;
+      }
+      .vote .n { font-weight: 700; }
+      .vote .arrow { font-size: 12px; color: var(--hint); }
+      .vote.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+      .vote.on .arrow { color: var(--on-accent); }
+      .vote:disabled { cursor: default; }
+      .empty { color: var(--hint); text-align: center; padding: 26px 10px; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1 id="title">Q&amp;A</h1>
+        <p id="sub">Loading…</p>
+      </header>
+
+      <section class="ask" id="askBox" hidden>
+        <textarea id="text" maxlength="280" placeholder="Ask the host a question"></textarea>
+        <div class="ask-row">
+          <span class="count" id="count">0 / 280</span>
+          <button class="send" id="send" disabled>Ask</button>
+        </div>
+        <div id="error"></div>
+      </section>
+
+      <div id="lists"></div>
+    </main>
+
+    <script>
+      const tg = window.Telegram?.WebApp
+      tg?.ready()
+      tg?.expand()
+
+      const params = new URLSearchParams(location.search)
+      const sid = tg?.initDataUnsafe?.start_param || params.get('sid') || ''
+      const headers = { 'content-type': 'application/json' }
+      if (tg?.initData) headers['x-telegram-init-data'] = tg.initData
+      else if (params.get('dev')) headers['x-dev-user'] = params.get('dev')
+
+      const $ = id => document.getElementById(id)
+      const el = (tag, cls, text) => {
+        const node = document.createElement(tag)
+        if (cls) node.className = cls
+        if (text !== undefined) node.textContent = text
+        return node
+      }
+
+      async function call(path, body) {
+        const res = await fetch(path, body ? { method: 'POST', headers, body: JSON.stringify(body) } : { headers })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error || 'Something went wrong.')
+        return data
+      }
+
+      function card(q) {
+        const live = q.status === 'live' || q.status === 'draft'
+        const node = el('div', 'q' + (live ? ' live' : ''))
+        const body = el('div', 'body')
+        if (live) body.append(el('div', 'badge', 'On the host’s glasses now'))
+        body.append(el('div', 'text', q.text))
+        const boost = q.boost > 0 ? ` · boosted ${q.boost} TON` : ''
+        body.append(el('div', 'who', (q.mine ? 'You' : q.tg_name) + boost))
+        if (q.status === 'answered' && q.summary) body.append(el('div', 'summary', q.summary))
+        node.append(body)
+
+        const vote = el('button', 'vote' + (q.voted ? ' on' : ''))
+        vote.append(el('span', 'arrow', '▲'), el('span', 'n', String(q.votes)))
+        vote.disabled = q.voted || q.status !== 'open'
+        vote.addEventListener('click', async () => {
+          vote.disabled = true
+          tg?.HapticFeedback?.impactOccurred('light')
+          await call('/api/app/vote', { qid: q.id }).catch(() => {})
+          refresh()
+        })
+        node.append(vote)
+        return node
+      }
+
+      let lastJson = ''
+      async function refresh() {
+        let data
+        try {
+          data = await call('/api/app/session/' + encodeURIComponent(sid))
+        } catch (e) {
+          $('sub').textContent = e.message
+          return
+        }
+        const json = JSON.stringify(data)
+        if (json === lastJson) return
+        lastJson = json
+
+        const ended = data.status !== 'live'
+        $('title').textContent = data.title
+        $('sub').textContent = ended
+          ? 'This Q&A has ended.'
+          : `Hosted by ${data.host || 'the host'}. The top question goes to their glasses.`
+        $('askBox').hidden = ended
+
+        const open = data.questions.filter(q => q.status !== 'answered')
+        const answered = data.questions.filter(q => q.status === 'answered')
+        const lists = $('lists')
+        lists.replaceChildren()
+        if (!ended) {
+          lists.append(el('h2', '', 'Waiting'))
+          if (open.length === 0) lists.append(el('div', 'empty', 'No questions yet. Ask the first one.'))
+          open.forEach(q => lists.append(card(q)))
+        }
+        if (answered.length) {
+          lists.append(el('h2', '', 'Answered'))
+          answered.forEach(q => lists.append(card(q)))
+        }
+      }
+
+      const text = $('text')
+      const send = $('send')
+      text.addEventListener('input', () => {
+        $('count').textContent = `${text.value.length} / 280`
+        send.disabled = text.value.trim().length < 5
+        $('error').textContent = ''
+      })
+      send.addEventListener('click', async () => {
+        send.disabled = true
+        try {
+          await call('/api/app/ask', { sid, text: text.value })
+          text.value = ''
+          $('count').textContent = '0 / 280'
+          tg?.HapticFeedback?.notificationOccurred('success')
+          await refresh()
+        } catch (e) {
+          $('error').textContent = e.message
+          send.disabled = false
+        }
+      })
+
+      if (!sid) {
+        $('sub').textContent = 'Open this from the “Ask or upvote” button in your group.'
+      } else {
+        refresh()
+        setInterval(refresh, 3000)
+      }
+    </script>
+  </body>
+</html>

@@ -95,13 +95,21 @@ export async function addQuestion(input: {
   tgName: string
   text: string
   short: string
+  tgMessageId?: number
 }): Promise<Question> {
   const rows = (await sql`
-    insert into questions (session_id, tg_user_id, tg_name, text, short)
-    values (${input.sessionId}, ${input.tgUserId}, ${input.tgName}, ${input.text}, ${input.short})
+    insert into questions (session_id, tg_user_id, tg_name, text, short, tg_message_id)
+    values (${input.sessionId}, ${input.tgUserId}, ${input.tgName}, ${input.text}, ${input.short}, ${input.tgMessageId ?? null})
     returning *`) as Question[]
   await sql`insert into votes (question_id, tg_user_id) values (${rows[0].id}, ${input.tgUserId})`
   return rows[0]
+}
+
+export async function openCountFor(sessionId: string, tgUserId: number): Promise<number> {
+  const rows = (await sql`
+    select count(*)::int as n from questions
+    where session_id = ${sessionId} and tg_user_id = ${tgUserId} and status = 'open'`) as { n: number }[]
+  return rows[0].n
 }
 
 /** Adds one vote per person. Returns the new total, or null if they had already voted. */
