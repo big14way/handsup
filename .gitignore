@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+.vercel
+*.ehpk
+.DS_Store

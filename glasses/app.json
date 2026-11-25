@@ -1,0 +1,20 @@
+{
+  "package_id": "com.big14way.handsup",
+  "edition": "202601",
+  "name": "Hands Up",
+  "version": "0.1.0",
+  "min_sdk_version": "0.0.16",
+  "entrypoint": "index.html",
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "Fetch the audience's questions for your session and send your taps back.",
+      "whitelist": ["http://localhost:8787"]
+    },
+    {
+      "name": "g2-microphone",
+      "desc": "Capture the answer you speak so a short summary can be posted to your Telegram group."
+    }
+  ],
+  "supported_languages": ["en"]
+}

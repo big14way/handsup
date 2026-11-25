@@ -1,0 +1,12 @@
+{
+  "name": "handsup",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["glasses", "server"],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:glasses": "npm run dev -w glasses",
+    "simulate": "npm run simulate -w glasses",
+    "build": "npm run build -w glasses && npm run typecheck -w server"
+  }
+}
