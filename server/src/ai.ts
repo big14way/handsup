@@ -44,7 +44,7 @@ export async function intake(text: string, waiting: Array<{ id: string; text: st
         'You prepare audience questions for a live Q&A. The host reads each question on smart glasses while speaking, ' +
         'so it must be readable in one glance.\n\n' +
         'Return two things.\n' +
-        '1. duplicate_of: the id of a waiting question that asks for the same information as the new one, or null. ' +
+        '1. duplicate_of: the id of an unanswered question (waiting, or on the host\'s glasses now) that asks for the same information as the new one, or null. ' +
         'Only match when one answer from the host would fully satisfy both people. A related question on the same topic is not a duplicate.\n' +
         `2. short: the new question in at most ${LENS_CHARS} characters. If it already fits, return it unchanged. ` +
         'Otherwise keep the asker\'s meaning and specifics (names, numbers, dates) and cut greetings and preamble. Never answer the question or add anything.\n\n' +

@@ -112,6 +112,14 @@ export async function openQuestions(sessionId: string): Promise<Array<{ id: stri
     order by created_at desc limit 40`) as Array<{ id: string; text: string }>
 }
 
+/** Questions not answered yet, including the one on the host's glasses: what a new question can repeat. */
+export async function unansweredQuestions(sessionId: string): Promise<Array<{ id: string; text: string }>> {
+  return (await sql`
+    select id::text as id, text from questions
+    where session_id = ${sessionId} and status in ('open', 'live', 'draft')
+    order by created_at desc limit 40`) as Array<{ id: string; text: string }>
+}
+
 export async function openCountFor(sessionId: string, tgUserId: number): Promise<number> {
   const rows = (await sql`
     select count(*)::int as n from questions

@@ -19,7 +19,8 @@ export async function ask(
     return { error: `You already have ${MAX_OPEN_PER_PERSON} questions waiting.` }
   }
   // If someone already asked this, the new asker's vote goes to that question instead.
-  const prepared = await intake(text, await db.openQuestions(session.id))
+  // The question on the host's glasses counts too: a repeat of it should not wait in line.
+  const prepared = await intake(text, await db.unansweredQuestions(session.id))
   if (prepared.duplicateOf) {
     await db.vote(prepared.duplicateOf, user.id)
     const existing = await db.questionById(prepared.duplicateOf)
