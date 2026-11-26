@@ -9,12 +9,17 @@
     {
       "name": "network",
       "desc": "Fetch the audience's questions for your session and send your taps back.",
-      "whitelist": ["http://localhost:8787"]
+      "whitelist": [
+        "https://handsuphq.vercel.app",
+        "http://localhost:8788"
+      ]
     },
     {
       "name": "g2-microphone",
       "desc": "Capture the answer you speak so a short summary can be posted to your Telegram group."
     }
   ],
-  "supported_languages": ["en"]
+  "supported_languages": [
+    "en"
+  ]
 }

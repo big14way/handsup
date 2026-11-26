@@ -1,4 +1,4 @@
-export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8787'
+export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8788'
 
 export type Current = {
   id: string

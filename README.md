@@ -23,14 +23,14 @@ Requires Node 22 or newer and a Postgres database (a free Neon project works).
 npm install
 cp server/.env.example server/.env    # set DATABASE_URL, and DEV_AUTH=1 for local testing
 npm run migrate -w server
-npm run dev:server                    # http://localhost:8787
+npm run dev:server                    # http://localhost:8788
 npm run dev:glasses                   # http://localhost:5173
 ```
 
 With `DEV_AUTH=1`, create a test session with sample questions and open it in the simulator:
 
 ```sh
-curl -X POST http://localhost:8787/api/dev/seed        # prints a 6-digit host code
+curl -X POST http://localhost:8788/api/dev/seed        # prints a 6-digit host code
 npx evenhub-simulator "http://localhost:5173/?code=<code>"
 ```
 

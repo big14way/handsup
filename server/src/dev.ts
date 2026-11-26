@@ -7,7 +7,7 @@ import { bot } from './telegram.js'
 // On Vercel the files in public/ are served by the platform; locally Hono does it.
 app.use('/*', serveStatic({ root: './public' }))
 
-const port = Number(process.env.PORT ?? 8787)
+const port = Number(process.env.PORT ?? 8788)
 serve({ fetch: app.fetch, port })
 console.log(`Hands Up server on http://localhost:${port}`)
 
