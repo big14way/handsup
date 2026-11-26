@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "pack": "npm run build && evenhub pack app.json dist -o handsup.ehpk",
+    "pack": "npm run build && node scripts/release-manifest.mjs && evenhub pack release/app.json dist -o handsup.ehpk",
     "simulate": "evenhub-simulator --automation-port 9898 http://localhost:5173"
   },
   "dependencies": {

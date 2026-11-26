@@ -7,3 +7,4 @@ dist
 *.ehpk
 .DS_Store
 .testnet-wallet*
+glasses/release/

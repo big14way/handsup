@@ -1,4 +1,8 @@
-export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8788'
+// The packaged app talks to the hosted server; `npm run dev` talks to a local one.
+// VITE_API_BASE overrides either (for example a dev build against production).
+export const API_BASE: string =
+  (import.meta.env.VITE_API_BASE as string | undefined) ??
+  (import.meta.env.PROD ? 'https://handsuphq.vercel.app' : 'http://localhost:8788')
 
 export type Current = {
   id: string
