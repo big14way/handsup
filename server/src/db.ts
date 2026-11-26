@@ -212,3 +212,14 @@ export async function listQuestions(sessionId: string, tgUserId: number) {
     mine: boolean
   }>
 }
+
+/** Credits one on-chain tip. Returns false if that transaction was already counted. */
+export async function addBoost(questionId: string, txHash: string, amount: number, from: string): Promise<boolean> {
+  const inserted = await sql`
+    insert into boosts (tx_hash, question_id, amount, from_address)
+    values (${txHash}, ${questionId}, ${amount}, ${from})
+    on conflict do nothing returning tx_hash`
+  if (inserted.length === 0) return false
+  await sql`update questions set boost = boost + ${amount} where id = ${questionId}`
+  return true
+}

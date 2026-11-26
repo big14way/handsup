@@ -5,6 +5,7 @@ import { summarise } from './ai.js'
 import { transcribe } from './stt.js'
 import { ask } from './questions.js'
 import { webhook } from './telegram.js'
+import { TIP_OPTIONS, TON_CHAIN, commentPayload, findTips, tipComment, toNano } from './ton.js'
 import { notify } from './notify.js'
 import { verifyInitData, type TgUser } from './tgauth.js'
 
@@ -186,6 +187,43 @@ audience.post('/vote', async c => {
   if (!/^\d+$/.test(id)) return c.json({ error: 'bad question' }, 400)
   const votes = await db.vote(id, c.var.user.id)
   return c.json({ votes })
+})
+
+/** What the Mini App needs to send a tip for one question through TON Connect. */
+audience.get('/tip/:qid', async c => {
+  const qid = c.req.param('qid')
+  const q = /^\d+$/.test(qid) ? await db.questionById(qid) : null
+  const session = q && (await db.sessionById(q.session_id))
+  if (!q || !session || session.status !== 'live' || q.status !== 'open') {
+    return c.json({ error: 'You can only tip a question that is still waiting.' }, 400)
+  }
+  if (!session.wallet) return c.json({ error: 'The host has not set a wallet for tips.' }, 400)
+  const comment = tipComment(q.id)
+  return c.json({
+    network: TON_CHAIN,
+    address: session.wallet,
+    comment,
+    payload: commentPayload(comment),
+    options: TIP_OPTIONS.map(ton => ({ ton, nano: toNano(ton) })),
+  })
+})
+
+/** Checks the chain for the tip and credits it. Safe to call repeatedly. */
+audience.post('/tip/:qid/check', async c => {
+  const qid = c.req.param('qid')
+  const q = /^\d+$/.test(qid) ? await db.questionById(qid) : null
+  const session = q && (await db.sessionById(q.session_id))
+  if (!q || !session?.wallet) return c.json({ error: 'not found' }, 404)
+  try {
+    const tips = await findTips(session.wallet, q.id)
+    let credited = 0
+    for (const tip of tips) if (await db.addBoost(q.id, tip.hash, tip.amount, tip.from)) credited += tip.amount
+    const fresh = await db.questionById(q.id)
+    return c.json({ credited, boost: Number(fresh?.boost ?? 0) })
+  } catch (e) {
+    console.error('tip check', e)
+    return c.json({ error: 'Could not reach TON testnet. Try again in a moment.' }, 502)
+  }
 })
 
 app.route('/api/app', audience)

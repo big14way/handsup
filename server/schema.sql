@@ -36,3 +36,12 @@ create table if not exists votes (
   tg_user_id bigint not null,
   primary key (question_id, tg_user_id)
 );
+
+-- One row per on-chain tip. The transaction hash makes crediting idempotent.
+create table if not exists boosts (
+  tx_hash text primary key,
+  question_id bigint not null references questions(id) on delete cascade,
+  amount numeric not null,
+  from_address text not null,
+  created_at timestamptz not null default now()
+);

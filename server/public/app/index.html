@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Hands Up</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/ui@2/dist/tonconnect-ui.min.js"></script>
     <style>
       :root {
         --bg: var(--tg-theme-secondary-bg-color, #f1f1f4);
@@ -54,6 +55,20 @@
       .vote.on .arrow { color: var(--on-accent); }
       .vote:disabled { cursor: default; }
       .empty { color: var(--hint); text-align: center; padding: 26px 10px; }
+      .tip { margin-top: 8px; background: transparent; color: var(--accent); padding: 0; font-size: 14px; font-weight: 600; }
+      .sheet-back { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); }
+      .sheet {
+        position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 16px 16px 0 0;
+        padding: 18px 16px 26px; max-width: 560px; margin: 0 auto;
+      }
+      .sheet h3 { margin: 0 0 4px; font-size: 17px; }
+      .sheet p { margin: 0 0 14px; color: var(--hint); font-size: 14px; }
+      .sheet .quote { color: var(--text); font-size: 15px; margin-bottom: 12px; }
+      .amounts { display: flex; gap: 8px; }
+      .amounts button { flex: 1; padding: 12px 0; border-radius: 10px; background: var(--bg); color: var(--text); font-weight: 600; }
+      .amounts button:disabled { opacity: 0.5; }
+      #tipStatus { min-height: 20px; margin-top: 12px; font-size: 14px; }
+      #tonConnect { margin-top: 12px; display: flex; justify-content: center; }
       [hidden] { display: none !important; }
     </style>
   </head>
@@ -75,6 +90,18 @@
 
       <div id="lists"></div>
     </main>
+
+    <div id="tipSheet" hidden>
+      <div class="sheet-back" id="tipBack"></div>
+      <div class="sheet">
+        <h3>Tip to push this question up</h3>
+        <p>TON testnet. The tip goes straight to the host’s wallet; Hands Up never holds it.</p>
+        <div class="quote" id="tipQuote"></div>
+        <div class="amounts" id="tipAmounts"></div>
+        <div id="tipStatus"></div>
+        <div id="tonConnect"></div>
+      </div>
+    </div>
 
     <script>
       const tg = window.Telegram?.WebApp
@@ -111,6 +138,11 @@
         const boost = q.boost > 0 ? ` · boosted ${q.boost} TON` : ''
         body.append(el('div', 'who', (q.mine ? 'You' : q.tg_name) + boost))
         if (q.status === 'answered' && q.summary) body.append(el('div', 'summary', q.summary))
+        if (tipsOn && q.status === 'open') {
+          const tip = el('button', 'tip', 'Tip TON to push it up')
+          tip.addEventListener('click', () => openTip(q))
+          body.append(tip)
+        }
         node.append(body)
 
         const vote = el('button', 'vote' + (q.voted ? ' on' : ''))
@@ -124,6 +156,88 @@
         })
         node.append(vote)
         return node
+      }
+
+      // ---------- TON testnet tips ----------
+
+      let tipsOn = false
+      let tonConnect = null
+      const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+      function wallet() {
+        if (!tonConnect && window.TON_CONNECT_UI) {
+          tonConnect = new TON_CONNECT_UI.TonConnectUI({
+            manifestUrl: location.origin + '/tonconnect-manifest.json',
+            buttonRootId: 'tonConnect',
+          })
+        }
+        return tonConnect
+      }
+
+      function closeTip() {
+        $('tipSheet').hidden = true
+      }
+      $('tipBack').addEventListener('click', closeTip)
+
+      async function openTip(q) {
+        $('tipQuote').textContent = q.text
+        $('tipStatus').textContent = ''
+        $('tipAmounts').replaceChildren()
+        $('tipSheet').hidden = false
+        let info
+        try {
+          info = await call('/api/app/tip/' + q.id)
+        } catch (e) {
+          $('tipStatus').textContent = e.message
+          return
+        }
+        const ui = wallet()
+        if (!ui) {
+          $('tipStatus').textContent = 'Could not load TON Connect.'
+          return
+        }
+        for (const option of info.options) {
+          const b = el('button', '', option.ton + ' TON')
+          b.addEventListener('click', () => sendTip(q, info, option, ui))
+          $('tipAmounts').append(b)
+        }
+      }
+
+      async function sendTip(q, info, option, ui) {
+        const buttons = [...$('tipAmounts').querySelectorAll('button')]
+        buttons.forEach(b => (b.disabled = true))
+        const status = $('tipStatus')
+        try {
+          if (!ui.connected) {
+            status.textContent = 'Connect a TON testnet wallet first.'
+            await ui.openModal()
+            buttons.forEach(b => (b.disabled = false))
+            return
+          }
+          status.textContent = 'Confirm the tip in your wallet…'
+          await ui.sendTransaction({
+            validUntil: Math.floor(Date.now() / 1000) + 300,
+            network: info.network,
+            messages: [{ address: info.address, amount: option.nano, payload: info.payload }],
+          })
+          status.textContent = 'Sent. Waiting for TON testnet to confirm…'
+          for (let i = 0; i < 20; i++) {
+            await sleep(4000)
+            const res = await call('/api/app/tip/' + q.id + '/check', {}).catch(() => null)
+            if (res && res.credited > 0) {
+              status.textContent = `Tip received. This question now has ${res.boost} TON behind it.`
+              tg?.HapticFeedback?.notificationOccurred('success')
+              lastJson = ''
+              refresh()
+              setTimeout(closeTip, 1800)
+              return
+            }
+          }
+          status.textContent = 'Still waiting for the chain. Your tip will count as soon as it lands.'
+        } catch (e) {
+          status.textContent = 'The tip was not sent.'
+          buttons.forEach(b => (b.disabled = false))
+        }
       }
 
       let lastJson = ''
@@ -140,6 +254,7 @@
         lastJson = json
 
         const ended = data.status !== 'live'
+        tipsOn = Boolean(data.wallet) && !ended
         $('title').textContent = data.title
         $('sub').textContent = ended
           ? 'This Q&A has ended.'

@@ -3,6 +3,7 @@ import * as db from './db.js'
 import { ask } from './questions.js'
 import { setNotifier } from './notify.js'
 import { displayName } from './tgauth.js'
+import { normaliseWallet } from './ton.js'
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -89,6 +90,27 @@ export function createBot(token: string): Bot {
     await ctx.react('👍').catch(() => {})
   })
 
+  // /wallet <address>: the host's TON testnet wallet, where tips to push a question up are paid.
+  bot.command('wallet', async ctx => {
+    if (!isGroup(ctx) || !ctx.from) return
+    const session = await db.liveSessionForChat(ctx.chat.id)
+    if (!session) return ctx.reply('Start a Q&A with /host first.')
+    if (String(session.host_tg_id) !== String(ctx.from.id)) return ctx.reply('Only the host can set the tip wallet.')
+    const arg = ctx.match.trim()
+    if (arg === 'off') {
+      await db.setWallet(session.id, null)
+      return ctx.reply('Tips are off for this Q&A.')
+    }
+    const wallet = normaliseWallet(arg)
+    if (!wallet) return ctx.reply('Send /wallet followed by your TON testnet address, or /wallet off.')
+    await db.setWallet(session.id, wallet)
+    return ctx.reply(
+      `Tips are on. Anyone can tip TON (testnet) to push their question up the queue. ` +
+        `Tips go straight to <code>${esc(wallet)}</code>; Hands Up never holds them.`,
+      { parse_mode: 'HTML' },
+    )
+  })
+
   bot.command('end', async ctx => {
     if (!isGroup(ctx) || !ctx.from) return
     const session = await db.liveSessionForChat(ctx.chat.id)
@@ -137,6 +159,7 @@ export async function registerCommands(bot: Bot): Promise<void> {
     [
       { command: 'host', description: 'Start a Q&A in this group (admins)' },
       { command: 'ask', description: 'Ask the host a question' },
+      { command: 'wallet', description: 'Host: set the TON testnet wallet for tips' },
       { command: 'end', description: 'End the Q&A' },
     ],
     { scope: { type: 'all_group_chats' } },
