@@ -30,7 +30,11 @@ export type Tip = { hash: string; amount: number; from: string }
 type TxResponse = {
   transactions: Array<{
     hash: string
-    description?: { aborted?: boolean; compute_ph?: { success?: boolean } }
+    description?: {
+      aborted?: boolean
+      credit_ph?: { credit?: string | null } | null
+      bounce?: unknown
+    }
     in_msg?: {
       source?: string | null
       value?: string | null
@@ -58,8 +62,11 @@ export async function findTips(wallet: string, questionId: string): Promise<Tip[
     const msg = tx.in_msg
     const decoded = msg?.message_content?.decoded
     if (!msg?.source || decoded?.type !== 'text_comment' || decoded.comment?.trim() !== comment) continue
-    if (tx.description?.aborted) continue
-    const amount = Number(msg.value ?? 0) / NANO
+    // A new wallet that has never sent anything has no code yet, so testnet marks
+    // every incoming transfer "aborted" even though the coins are credited. What
+    // matters is whether the money stayed: a bounced transfer went back to the sender.
+    if (tx.description?.bounce) continue
+    const amount = Number(tx.description?.credit_ph?.credit ?? msg.value ?? 0) / NANO
     if (amount <= 0) continue
     tips.push({ hash: tx.hash, amount, from: msg.source })
   }
