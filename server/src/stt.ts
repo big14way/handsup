@@ -32,8 +32,12 @@ function isQuiet(pcm: Uint8Array): boolean {
 
 export const sttConfigured = () => Boolean(process.env.GROQ_API_KEY)
 
-/** Transcribes a chunk of the host's speech. Returns '' when there is nothing usable. */
-export async function transcribe(pcm: Uint8Array): Promise<string> {
+/**
+ * Transcribes a chunk of the host's speech. Returns '' when there is nothing usable.
+ * `context` is the question and what was heard so far: Whisper uses it to spell
+ * names and jargon the way the audience wrote them.
+ */
+export async function transcribe(pcm: Uint8Array, context = ''): Promise<string> {
   const key = process.env.GROQ_API_KEY
   if (!key || pcm.length < 16_000 || isQuiet(pcm)) return ''
   const form = new FormData()
@@ -41,6 +45,7 @@ export async function transcribe(pcm: Uint8Array): Promise<string> {
   form.append('model', 'whisper-large-v3-turbo')
   form.append('response_format', 'json')
   form.append('temperature', '0')
+  if (context.trim()) form.append('prompt', context.trim().slice(-600))
   const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}` },

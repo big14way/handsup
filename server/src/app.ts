@@ -108,7 +108,7 @@ host.post('/audio', async c => {
   const pcm = new Uint8Array(await c.req.arrayBuffer())
   if (pcm.length > 2_000_000) return c.json({ error: 'chunk too large' }, 413)
   try {
-    const text = await transcribe(pcm)
+    const text = await transcribe(pcm, `${current.text} ${current.transcript}`)
     if (text) await db.appendTranscript(id, text)
     return c.json({ ok: true, heard: text.length > 0 })
   } catch (e) {

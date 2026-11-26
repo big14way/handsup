@@ -17,7 +17,22 @@ const ROWS = [
   { id: 3, name: 'foot', y: 244, h: 44, color: 2, capture: 0 },
 ] as const
 
-export async function createLens(bridge: EvenAppBridge, first: Card) {
+/**
+ * The G2 font has no emoji and draws them as empty outlines, which Telegram
+ * names are full of. Drop them and tidy the gaps they leave.
+ */
+function forLens(text: string): string {
+  return (
+    text
+      .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}‍️⃣]/gu, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/^ ?· /, '')
+      .trim() || ' '
+  )
+}
+
+export async function createLens(bridge: EvenAppBridge, firstCard: Card) {
+  const first: Card = { head: forLens(firstCard.head), body: forLens(firstCard.body), foot: forLens(firstCard.foot) }
   const shown: Record<string, string> = { ...first }
 
   const page = {
@@ -53,7 +68,7 @@ export async function createLens(bridge: EvenAppBridge, first: Card) {
 
   function show(card: Card): void {
     for (const row of ROWS) {
-      const content = card[row.name] || ' '
+      const content = forLens(card[row.name] || ' ')
       if (shown[row.name] === content) continue
       shown[row.name] = content
       queue = queue
