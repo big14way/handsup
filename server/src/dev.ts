@@ -11,8 +11,10 @@ const port = Number(process.env.PORT ?? 8788)
 serve({ fetch: app.fetch, port })
 console.log(`Hands Up server on http://localhost:${port}`)
 
-// Local development talks to Telegram by long polling, so no public URL is needed.
-if (bot) {
+// Local development can talk to Telegram by long polling, so no public URL is needed.
+// Polling removes the webhook, so it only runs when asked for: with the same bot
+// token deployed, it would take the bot away from the live server.
+if (bot && process.env.BOT_POLLING === '1') {
   await registerCommands(bot)
   void bot.start({ onStart: me => console.log(`Bot @${me.username} is polling`) })
 }
