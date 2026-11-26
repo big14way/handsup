@@ -5,7 +5,7 @@ import { summarise } from './ai.js'
 import { transcribe } from './stt.js'
 import { ask } from './questions.js'
 import { webhook } from './telegram.js'
-import { TIP_OPTIONS, TON_CHAIN, commentPayload, findTips, tipComment, toNano } from './ton.js'
+import { TIP_OPTIONS, TON_CHAIN, commentPayload, findTips, recentTips, tipComment, toNano } from './ton.js'
 import { notify } from './notify.js'
 import { verifyInitData, type TgUser } from './tgauth.js'
 
@@ -40,6 +40,24 @@ host.use('*', async (c, next) => {
   c.set('session', session)
   await next()
 })
+
+/**
+ * Credits any tips that have landed for this session's waiting questions. Runs
+ * right before the next question is picked, so a tip always counts in the order,
+ * even if the tipper closed the Mini App before the chain confirmed it.
+ */
+async function syncTips(session: db.Session): Promise<void> {
+  if (!session.wallet) return
+  try {
+    const waiting = new Set((await db.openQuestions(session.id)).map(q => String(q.id)))
+    if (waiting.size === 0) return
+    for (const tip of await recentTips(session.wallet)) {
+      if (waiting.has(tip.questionId)) await db.addBoost(tip.questionId, tip.hash, tip.amount, tip.from)
+    }
+  } catch (e) {
+    console.error('tip sync', e)
+  }
+}
 
 async function hostState(session: db.Session) {
   if (session.status !== 'live') {
@@ -81,6 +99,7 @@ host.post('/done', async c => {
     } else {
       const done = await db.setStatus(q.id, 'answered')
       if (done) await notify.answered(session, done, null)
+      await syncTips(session)
     }
   }
   return c.json(await hostState(session))
@@ -96,6 +115,7 @@ host.post('/draft', async c => {
     if (!post) await db.clearSummary(q.id)
     const done = await db.setStatus(q.id, 'answered')
     if (done) await notify.answered(session, done, post ? q.summary : null)
+    await syncTips(session)
   }
   return c.json(await hostState(session))
 })
@@ -123,6 +143,7 @@ host.post('/skip', async c => {
   if (q?.status === 'live') {
     const skipped = await db.setStatus(q.id, 'skipped')
     if (skipped) await notify.skipped(session, skipped)
+    await syncTips(session)
   }
   return c.json(await hostState(session))
 })

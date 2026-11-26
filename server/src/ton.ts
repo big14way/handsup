@@ -2,7 +2,7 @@ import { Address, beginCell } from '@ton/core'
 
 /** Demos must not move real money, so Hands Up only talks to TON testnet. */
 export const TON_CHAIN = '-3'
-const API = 'https://testnet.toncenter.com/api/v3'
+const API = 'https://testnet.toncenter.com/api/v2'
 
 /** Tip sizes offered in the Mini App, in TON. */
 export const TIP_OPTIONS = [0.1, 0.5, 1]
@@ -27,50 +27,60 @@ export function commentPayload(text: string): string {
 
 export type Tip = { hash: string; amount: number; from: string }
 
-type TxResponse = {
-  transactions: Array<{
-    hash: string
-    description?: {
-      aborted?: boolean
-      credit_ph?: { credit?: string | null } | null
-      bounce?: unknown
-    }
-    in_msg?: {
-      source?: string | null
-      value?: string | null
-      message_content?: { decoded?: { type?: string; comment?: string } | null } | null
-    } | null
-  }>
+type V2Transaction = {
+  transaction_id: { hash: string }
+  in_msg?: { source?: string; value?: string; message?: string } | null
+  out_msgs?: Array<{ destination?: string; message?: string }>
+}
+
+const TIP_PATTERN = /^Hands Up tip #(\d+)$/
+/** A bounced transfer sends the money back with a body that starts with 0xFFFFFFFF ("/////w" in base64). */
+const BOUNCE_PREFIX = '/////w'
+
+const sameAddress = (a?: string, b?: string) => {
+  try {
+    return Boolean(a && b) && Address.parse(a!).equals(Address.parse(b!))
+  } catch {
+    return false
+  }
 }
 
 /**
- * Reads the host wallet's recent incoming transfers and returns the tips for
- * one question. The money goes straight from the asker to the host; Hands Up
- * only reads the chain and never holds funds.
+ * Reads the host wallet's recent incoming transfers and returns the Hands Up tips
+ * among them, for any question. The money goes straight from the asker to the
+ * host; Hands Up only reads the chain and never holds funds.
+ *
+ * This uses toncenter's v2 API, which reads the chain directly. The v3 index can
+ * lag by minutes on testnet, which is too slow for a question to jump the queue
+ * while the audience watches.
  */
-export async function findTips(wallet: string, questionId: string): Promise<Tip[]> {
-  const raw = Address.parse(wallet).toRawString()
-  const url = `${API}/transactions?account=${encodeURIComponent(raw)}&limit=50&sort=desc`
+export async function recentTips(wallet: string): Promise<Array<Tip & { questionId: string }>> {
+  const url = `${API}/getTransactions?address=${encodeURIComponent(wallet)}&limit=50`
   const headers: Record<string, string> = {}
   if (process.env.TONCENTER_API_KEY) headers['x-api-key'] = process.env.TONCENTER_API_KEY
   const res = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new Error(`toncenter ${res.status}`)
-  const data = (await res.json()) as TxResponse
-  const comment = tipComment(questionId)
-  const tips: Tip[] = []
-  for (const tx of data.transactions ?? []) {
+  const data = (await res.json()) as { ok?: boolean; result?: V2Transaction[] }
+  const tips: Array<Tip & { questionId: string }> = []
+  for (const tx of data.result ?? []) {
     const msg = tx.in_msg
-    const decoded = msg?.message_content?.decoded
-    if (!msg?.source || decoded?.type !== 'text_comment' || decoded.comment?.trim() !== comment) continue
-    // A new wallet that has never sent anything has no code yet, so testnet marks
-    // every incoming transfer "aborted" even though the coins are credited. What
-    // matters is whether the money stayed: a bounced transfer went back to the sender.
-    if (tx.description?.bounce) continue
-    const amount = Number(tx.description?.credit_ph?.credit ?? msg.value ?? 0) / NANO
+    const match = TIP_PATTERN.exec((msg?.message ?? '').trim())
+    if (!msg?.source || !match) continue
+    // Transfers to a wallet that has never sent anything still count: the coins
+    // are credited. Only a transfer that bounced back to the sender does not.
+    const bounced = (tx.out_msgs ?? []).some(
+      out => sameAddress(out.destination, msg.source) && (out.message ?? '').startsWith(BOUNCE_PREFIX),
+    )
+    if (bounced) continue
+    const amount = Number(msg.value ?? 0) / NANO
     if (amount <= 0) continue
-    tips.push({ hash: tx.hash, amount, from: msg.source })
+    tips.push({ hash: tx.transaction_id.hash, amount, from: msg.source, questionId: match[1] })
   }
   return tips
+}
+
+export async function findTips(wallet: string, questionId: string): Promise<Tip[]> {
+  return (await recentTips(wallet)).filter(tip => tip.questionId === questionId)
 }
 
 export const toNano = (ton: number) => String(Math.round(ton * NANO))

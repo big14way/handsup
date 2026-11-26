@@ -221,8 +221,9 @@
             messages: [{ address: info.address, amount: option.nano, payload: info.payload }],
           })
           status.textContent = 'Sent. Waiting for TON testnet to confirm…'
-          for (let i = 0; i < 20; i++) {
-            await sleep(4000)
+          // Testnet usually confirms in seconds but can take a few minutes.
+          for (let i = 0; i < 36; i++) {
+            await sleep(i < 15 ? 3000 : 6000)
             const res = await call('/api/app/tip/' + q.id + '/check', {}).catch(() => null)
             if (res && res.credited > 0) {
               status.textContent = `Tip received. This question now has ${res.boost} TON behind it.`
@@ -233,7 +234,7 @@
               return
             }
           }
-          status.textContent = 'Still waiting for the chain. Your tip will count as soon as it lands.'
+          status.textContent = 'Still waiting for TON testnet. Your tip is checked again before the host moves to the next question, so it will still count.'
         } catch (e) {
           status.textContent = 'The tip was not sent.'
           buttons.forEach(b => (b.disabled = false))
