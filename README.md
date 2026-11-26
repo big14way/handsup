@@ -137,6 +137,12 @@ npx evenhub-simulator "http://localhost:5173/?code=<code>"
 
 The simulator uses your computer's microphone, so you can answer out loud.
 
+To run the packaged build against the live server instead (this is what the demo video uses):
+
+```sh
+npm run demo -w glasses      # then enter the code the bot sent you
+```
+
 ## Deploy
 
 ```sh

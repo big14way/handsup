@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "pack": "npm run build && node scripts/release-manifest.mjs && evenhub pack release/app.json dist -o handsup.ehpk",
-    "simulate": "evenhub-simulator --automation-port 9898 http://localhost:5173"
+    "simulate": "evenhub-simulator --automation-port 9898 http://localhost:5173",
+    "demo": "sh scripts/demo.sh"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "0.0.16"
