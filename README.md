@@ -11,7 +11,7 @@ The audience asks and votes in Telegram. The top question sits on the host's len
 
 - Live server: https://handsuphq.vercel.app
 - Telegram bot: [@handsuphq_bot](https://t.me/handsuphq_bot)
-- Demo video: _link added at submission_
+- Demo video (2:37): https://youtu.be/2tZL25GZaHY
 - Glasses package: [`handsup.ehpk` in Releases](https://github.com/big14way/handsup/releases/latest)
 
 Built for the **Heads Up: Even Realities Hackathon** (Nov 23–29, 2026).
