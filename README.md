@@ -25,6 +25,19 @@ People who run AMAs, community calls, meetups and talks take questions from Tele
 
 Anyone who talks to a room or a call and takes questions from a Telegram community: crypto and developer AMAs, founders at demo days, meetup speakers, and community managers running weekly calls.
 
+## Why this is worth building
+
+- **People already pay to manage audience questions.** Slido and Mentimeter charge about $15–25 per presenter per month ([Capterra](https://www.capterra.com/p/154051/Slido/pricing/), [Software Advice](https://www.softwareadvice.com/productivity/mentimeter-profile/)). Slido says it was used at more than 225,000 events in 2019 alone ([Slido](https://blog.slido.com/slido-2019-review/)). Mentimeter's revenue was about $38M a year in early 2024 ([Latka](https://getlatka.com/companies/mentimeter)). Both make the audience leave the chat for a separate web page, and neither works on glasses.
+- **The communities are already on Telegram.** Telegram passed 1 billion monthly users in March 2025 ([TechCrunch](https://techcrunch.com/?p=2983530)), and Telegram said in June 2024 that more than 500 million people use Mini Apps every month ([Telegram](https://telegram.org/blog/mini-app-bar-paid-media-and-more)). AMA guides tell hosts to collect questions before the session because the live chat floods ([Coinbound](https://coinbound.io/how-to-host-a-crypto-ama/)).
+- **Locally the need is sharper.** Nigeria has an estimated 8 million Telegram users ([Guardian Nigeria](https://guardian.ng/news/8m-nigerians-vulnerable-as-telegram-users-face-cyberattacks/)) and ranked 6th in the world for crypto adoption in 2025 ([Chainalysis via Technext](https://technext24.com/2025/09/04/crypto-nigeria-slips-india-and-u-s-lead/)). Its builder and crypto communities run their AMAs and calls in Telegram groups.
+- **Glasses are growing fast, from a small base.** AI glasses shipments rose 263% year on year in the first half of 2026 ([Counterpoint via 9to5Mac](https://9to5mac.com/2026/09/21/report-ai-glasses-shipments-surged-263-in-h1-2026-as-apple-prepares-to-enter-the-market/)). Display glasses like G2 are still a small share, so Hands Up also works from the phone screen. The glasses are what make it hands-free.
+
+## Who pays
+
+- **Free** for groups of up to 100 people, so any community can try it in its next AMA.
+- **Communities: about $15 a month, paid in Telegram Stars** (planned), for unlimited audience size, more than one host, a recap of every answer posted after the session, and question stats.
+- **Tips stay with the host.** Hands Up takes no cut and never holds the money.
+
 ## How a session runs
 
 1. The host adds [@handsuphq_bot](https://t.me/handsuphq_bot) to the group and sends `/host`. The bot posts "Q&A is live" with an **Ask or upvote** button and DMs the host a 6-digit code.
